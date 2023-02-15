@@ -18,18 +18,22 @@ this wrapper emits the requested number of bytes (and no more) only when they al
 So if the bytes you wait for from the stream are processable as a whole, you don't need to
 check the length of Buffers nor slice and concatenate them.
 
+__Compatibility__
+
+Node 12<
+
 ## Installation
 
 Add it to your project using a package manager, eg.
 
 ```
-npm install socket-packet-assembler --save
+npm install socket-packet-assembler
 ```
 
-To run tests:
+To run tests in development environment:
 
 ```
-npm test
+npm install && npm test
 ```
 
 ## Public API
