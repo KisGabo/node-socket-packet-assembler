@@ -20,7 +20,7 @@ check the length of Buffers nor slice and concatenate them.
 
 __Compatibility__
 
-Node 12<
+Node 12+
 
 ## Installation
 
