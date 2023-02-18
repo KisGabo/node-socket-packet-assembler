@@ -9,9 +9,9 @@ declare class SocketPacketAssembler extends EventEmitter {
   /** The original Socket object wrapped. */
   public readonly origSocket: Socket;
 
-  private bytesToRead: number;
-  private eventName: string;
-  private buffer: Buffer;
+  private bytesToRead: number|null;
+  private eventName: string|null;
+  private buffer: Buffer|null;
 
   /**
    * Initialize an assembler on given socket
@@ -27,7 +27,7 @@ declare class SocketPacketAssembler extends EventEmitter {
    * @param bytesToRead
    * @param [identifier=data] - Name of event emitted when bytes arrived.
    */
-  public readBytes(bytesToRead: number, identifier: string): void;
+  public readBytes(bytesToRead: number, identifier: string|null|undefined): void;
 
   private emitIfNecessary(): void;
   private bufferData(data: Buffer): void;
