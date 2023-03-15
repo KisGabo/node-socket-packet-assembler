@@ -36,7 +36,7 @@ To run tests in development environment:
 npm install && npm test
 ```
 
-## Public API~~~~~~~~
+## Public API
 
 __`class SocketPacketAssembler extends events.EventEmitter`__
 
