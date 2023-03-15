@@ -36,7 +36,7 @@ To run tests in development environment:
 npm install && npm test
 ```
 
-## Public API
+## Public API~~~~~~~~
 
 __`class SocketPacketAssembler extends events.EventEmitter`__
 
@@ -45,12 +45,18 @@ __`class SocketPacketAssembler extends events.EventEmitter`__
 * `readonly origSocket: net.Socket`  
     The Socket object which is wrapped.
 * `readBytes(bytesToRead: number, identifier: string = "data"): void`  
-    Set how many bytes you want to receive in the next event.
+    Receive the given number of bytes via a single event, which is emitted when all the requested bytes have arrived.  
     You may use a custom event name (`identifier`).  
     If there are enough bytes in the internal buffer at the time of call, it triggers the event asynchronously.  
-    It can't be called again until the event is triggered.
+    This or `pipeBytesToStream()` can't be called again until the event is triggered.
+* `pipeBytesToStream(bytesToRead: number): stream.Readable`  
+    Receive the given number of bytes via a stream, which ends immediately after all the requested bytes have been pushed to it.  
+    If there are some bytes in the internal buffer at the time of call, it pushes the data to the stream immediately.  
+    This or `readBytes()` can't be called again until the stream ends.
 
 ## Example
+
+### Using events to handle incoming data
 
 ```javascript
 const SocketPacketAssembler = require('socket-packet-assembler');
@@ -65,7 +71,7 @@ tcpServer.on('connection', socket => {
     // you should process the buffer here
     // (which contains exactly 64 bytes).
   
-    // Now we wait for the first 1024-byte message
+    // Now we are expecting the first 1024-byte message
     assembler.readBytes(1024, 'message');
   });
   
@@ -73,12 +79,34 @@ tcpServer.on('connection', socket => {
     // This is a 1024-byte message,
     // you should process the buffer here
     // (which contains exactly 1024 bytes).
-  
-    // Wait for another message
-    assembler.readBytes(1024, 'message');
+
+    if (doesIndicateIncomingFile(buffer)) {
+      // We prepare to receive a file over the socket, and pipe the incoming bytes
+      // straight to a file on the disk.
+        
+      const fileWriteStream = fs.createWriteStream('incoming');
+      
+      const incomingDataStream = assembler.pipeBytesToStream(
+        // Extract the filesize from the message so we know how many bytes to expect
+        getIncomingFileSize(buffer)
+      );
+      
+      incomingDataStream.end(() => {
+        // Expect the next message after the file transfer has finished
+        assembler.readBytes(1024, 'message');
+      });
+      
+      incomingDataStream.pipe(fileWriteStream);
+    } else {
+      // Do something with the message
+      processMessage(buffer);
+
+      // Expect another message after processing finished
+      assembler.readBytes(1024, 'message');
+    }
   });
   
-  // At first, we wait for some kind of greeting from client,
+  // At first, we expect some kind of greeting from client,
   // which must be 64 bytes.
   assembler.readBytes(64, 'greeting');
   

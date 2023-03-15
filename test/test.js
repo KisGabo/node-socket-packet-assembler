@@ -212,4 +212,141 @@ describe('Socket Packet Assembler', function () {
     clock.restore();
   });
 
+  it('should buffer all bytes & stream the requested number of bytes, then end the stream', async function () {
+    const endHandler = sinon.spy(()=> {});
+
+    const testBuf = Buffer.from([ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ]);
+    let bufFromStream = Buffer.from([]);
+
+    sock.origSocket.emit('data', testBuf.slice(0, 5));
+
+    sock.pipeBytesToStream(10)
+      .on('data', buf => bufFromStream = Buffer.concat([bufFromStream, buf]))
+      .on('end', endHandler);
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromStream.equals(testBuf.slice(0, 5))).be.true;
+    expect(endHandler).not.been.called;
+
+    sock.origSocket.emit('data', testBuf.slice(5));
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromStream.equals(testBuf.slice(0, 10))).be.true;
+    expect(endHandler).been.calledOnce;
+
+    sock.pipeBytesToStream(5)
+        .on('data', buf => bufFromStream = Buffer.concat([bufFromStream, buf]))
+        .on('end', endHandler);
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromStream.equals(testBuf)).be.true;
+    expect(endHandler).been.calledTwice;
+  });
+
+  it('should handle event and stream modes mixed ', async function () {
+    sock.on('data', buf => bufFromSocket = Buffer.concat([bufFromSocket, buf]));
+
+    const endHandler = sinon.spy(()=> {});
+
+    const testBuf = Buffer.from([ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ]);
+    let bufFromSocket = Buffer.from([]);
+
+    sock.pipeBytesToStream(3)
+        .on('data', buf => bufFromSocket = Buffer.concat([bufFromSocket, buf]))
+        .on('end', endHandler);
+
+    sock.origSocket.emit('data', testBuf.slice(0, 5));
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 3))).be.true;
+    expect(endHandler).been.calledOnce;
+
+    sock.readBytes(2);
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 5))).be.true;
+
+    sock.origSocket.emit('data', testBuf.slice(5, 6));
+
+    sock.pipeBytesToStream(3)
+        .on('data', buf => bufFromSocket = Buffer.concat([bufFromSocket, buf]))
+        .on('end', endHandler);
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 6))).be.true;
+    expect(endHandler).been.calledOnce;
+
+    sock.origSocket.emit('data', testBuf.slice(6, 10));
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 8))).be.true;
+    expect(endHandler).been.calledTwice;
+
+    sock.readBytes(4);
+
+    sock.origSocket.emit('data', testBuf.slice(10, 11));
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 8))).be.true;
+
+    sock.origSocket.emit('data', testBuf.slice(11));
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf.slice(0, 12))).be.true;
+
+    sock.pipeBytesToStream(10)
+        .on('data', buf => bufFromSocket = Buffer.concat([bufFromSocket, buf]))
+        .on('end', endHandler);
+
+    await waitForTimeoutQueue();
+
+    expect(bufFromSocket.equals(testBuf)).be.true;
+    expect(endHandler).been.calledTwice;
+  });
+
+  it('#pipeBytesToStream() should not allow to alter the number of bytes to pipe', function () {
+    sock.pipeBytesToStream(5);
+
+    expect(() => sock.pipeBytesToStream(6)).throw(Error);
+  });
+
+  it('should allow to call #readBytes() in the data event handler', async function () {
+    const handler = sinon.spy(() => sock.readBytes(1));
+
+    sock.on('data', handler);
+
+    sock.readBytes(1);
+
+    sock.origSocket.emit('data', Buffer.from([1]));
+
+    await waitForTimeoutQueue();
+
+    expect(handler).be.calledOnce;
+  });
+
+  it('should allow to call #pipeBytesToStream() in the end event handler', async function () {
+    const handler = sinon.spy(() => sock.pipeBytesToStream(1));
+
+    sock.pipeBytesToStream(1).on('data', () => {}).on('end', handler);
+
+    sock.origSocket.emit('data', Buffer.from([1]));
+
+    await waitForTimeoutQueue();
+
+    expect(handler).be.calledOnce;
+  });
+
 });
+
+function waitForTimeoutQueue() {
+  return new Promise(resolve => setTimeout(resolve));
+}
